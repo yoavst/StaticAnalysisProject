@@ -1,7 +1,5 @@
 package com.yoavst.sa.parsing
 
-import java.util.*
-
 open class Node<T, E>(
     open val value: T,
     open val outEdges: List<Pair<E, Node<T, E>>>,
@@ -9,15 +7,27 @@ open class Node<T, E>(
 )
 
 class MutableNode<T, E>(
-    override val value: T,
+    override var value: T,
     override val outEdges: MutableList<Pair<E, Node<T, E>>>,
     override val inEdges: MutableList<Pair<E, Node<T, E>>>
 ) :
     Node<T, E>(value, outEdges, inEdges)
 
-typealias CFGNode = MutableNode<MutableList<ASTStatement>, ASTAssumption>
+typealias CFGNode = MutableNode<Int, ASTStatement>
 
-data class ControlFlowGraph(val startingNode: CFGNode, val tree: List<CFGNode>)
+data class ControlFlowGraph(val startingNode: CFGNode, val tree: List<CFGNode>) {
+    override fun toString(): String = buildString {
+        appendLine("digraph {")
+        for (node in tree) {
+            for (edge in node.outEdges) {
+                appendLine("\tL${node.value} -> L${edge.second.value} [label=\"${
+                    edge.first.toString().replace('"', '\'')
+                }\"]")
+            }
+        }
+        appendLine("}")
+    }
+}
 
 fun ASTProgram.toCFG(): ControlFlowGraph? {
     // Checks that the variables that are referenced in the code, are listed on the variables list
@@ -29,24 +39,18 @@ fun ASTProgram.toCFG(): ControlFlowGraph? {
     // create the tree, recursively
     // step 1. Create the nodes
     val mapping = mutableMapOf<Int, CFGNode>()
-    for ((from, _, statement) in edges) {
+    for ((from, to, statement) in edges) {
         if (from in mapping) {
-            if (statement !is ASTStatement.AssumeStatement || mapping[from]!!.value.isNotEmpty()) {
+            if (statement !is ASTStatement.AssumeStatement || mapping[from]!!.outEdges.isNotEmpty()) {
                 println("If a node has more than one outgoing edges than these edges MUST BE annotated with assume commands.")
                 return null
             }
         } else {
-            if (statement !is ASTStatement.AssumeStatement) {
-                mapping[from] = CFGNode(mutableListOf(statement), mutableListOf(), mutableListOf())
-            } else {
-                mapping[from] = CFGNode(mutableListOf(), mutableListOf(), mutableListOf())
-            }
+            mapping[from] = CFGNode(from, mutableListOf(), mutableListOf())
         }
     }
     // step 2. Add edges
     for ((from, to, statement) in edges) {
-        val assumption =
-            if (statement is ASTStatement.AssumeStatement) statement.assumption else ASTAssumption.TrueAssumption
         val vertexFrom = mapping[from]
         var vertexTo = mapping[to]
         if (vertexFrom == null) {
@@ -54,12 +58,11 @@ fun ASTProgram.toCFG(): ControlFlowGraph? {
             return null
         } else if (vertexTo == null) {
             // make sense for the final vertex
-            vertexTo = CFGNode(mutableListOf(), mutableListOf(), mutableListOf())
+            vertexTo = CFGNode(to, mutableListOf(), mutableListOf())
             mapping[to] = vertexTo
         }
-        vertexFrom.outEdges.add(assumption to vertexTo)
-        vertexTo.inEdges.add(assumption to vertexFrom)
-
+        vertexFrom.outEdges.add(statement to vertexTo)
+        vertexTo.inEdges.add(statement to vertexFrom)
     }
 
     // find starting node
@@ -76,50 +79,5 @@ fun ASTProgram.toCFG(): ControlFlowGraph? {
         }
     }
 
-    // Try merge nodes by BFS from starting node
-    // We do this for better performance when doing the static analysis itself
-
-    // we can merge node A with node B if:
-    // A -> B by TRUE assumption
-    // A is the only in edge to B
-    // B is the only out edge to A
-    val availableNodes = mutableSetOf<CFGNode>()
-    val stack = ArrayDeque<CFGNode>()
-    stack.push(startingNode)
-
-    while (stack.isNotEmpty()) {
-        val node = stack.pop()
-        availableNodes.add(node)
-        if (node.outEdges.size != 1) {
-            // just add nodes to stack
-            for ((_, next) in node.outEdges) {
-                if (next !in availableNodes)
-                    stack.push(next as CFGNode) // Kotlin inference bug
-            }
-        } else {
-            val (assumption, next) = node.outEdges.first()
-            if (assumption != ASTAssumption.TrueAssumption || next.inEdges.size != 1) {
-                if (next !in availableNodes)
-                    stack.push(next as CFGNode)
-            } else {
-                // merge them
-                node.value.addAll(next.value)
-                node.outEdges.clear()
-                node.outEdges.addAll(next.outEdges)
-                next.outEdges.forEach { (_, nextNext) ->
-                    // replace in refs to next
-                    val inEdges = nextNext.inEdges as MutableList
-                    for (i in inEdges.indices) {
-                        if (inEdges[i].second == next) {
-                            inEdges[i] = inEdges[i].first to node
-                        }
-                    }
-                }
-                stack.push(node)
-            }
-        }
-    }
-
-
-    return ControlFlowGraph(startingNode, availableNodes.toList())
+    return ControlFlowGraph(startingNode, mapping.values.toList())
 }
