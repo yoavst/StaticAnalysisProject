@@ -1,11 +1,14 @@
 package com.yoavst.sa.analysis.utils
 
+import java.math.BigInteger
+
 interface Lattice<T> {
     val bottom: T
     val top: T
     fun gcd(item1: T, item2: T): T
     fun lcm(item1: T, item2: T): T
     fun compare(item1: T, item2: T): CompareResult
+    val size: Int?
 }
 
 enum class CompareResult {
@@ -49,6 +52,8 @@ class DisjointLattice<T>(private val lattice: Lattice<T>, private val dimension:
         }
         return res
     }
+
+    override val size: Int? = lattice.size?.let { it * dimension }
 }
 
 private class TopSet<T> : Set<T> {
@@ -66,30 +71,35 @@ private class TopSet<T> : Set<T> {
     override fun hashCode(): Int = error("Should not call this method on top set")
 }
 
-fun <T> Set<T>.isPowerSetTop() = this is TopSet<*>
 
-class PowerSetLattice<T> : Lattice<Set<T>> {
+class PowerSetLattice<T>(private val lattice: Lattice<T>) : Lattice<Set<T>> {
     override val bottom: Set<T> = emptySet()
 
     /* We'll treat this special ref as the top */
     override val top: Set<T> = TopSet()
 
+    override val size: Int? by lazy {
+        if (lattice.size == null)
+            null
+        else BigInteger("2").pow(lattice.size!!).toInt()
+    }
+
     override fun gcd(item1: Set<T>, item2: Set<T>): Set<T> = when {
-        item1.isPowerSetTop() -> item2
-        item2.isPowerSetTop() -> item1
+        isTop(item1) -> item2
+        isTop(item2) -> item1
         else -> item1.intersect(item2)
     }
 
     override fun lcm(item1: Set<T>, item2: Set<T>): Set<T> = when {
-        item1.isPowerSetTop() -> item1
-        item2.isPowerSetTop() -> item2
+        isTop(item1) -> item1
+        isTop(item2) -> item2
         else -> item1.intersect(item2)
     }
 
     override fun compare(item1: Set<T>, item2: Set<T>): CompareResult {
-        if (item1.isPowerSetTop()) {
-            return if (item2.isPowerSetTop()) CompareResult.Equal else CompareResult.MoreThan
-        } else if (item2.isPowerSetTop()) {
+        if (isTop(item1)) {
+            return if (isTop(item2)) CompareResult.Equal else CompareResult.MoreThan
+        } else if (isTop(item2)) {
             return CompareResult.LessThan
         }
 
@@ -103,6 +113,9 @@ class PowerSetLattice<T> : Lattice<Set<T>> {
             else -> CompareResult.NonComparable
         }
     }
+
+    fun isTop(item: Set<T>): Boolean = item is TopSet<*> || item.size == size
+
 
 }
 

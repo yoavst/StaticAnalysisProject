@@ -33,5 +33,7 @@ enum class Parity {
             item1 == Unknown || item2 == Bottom -> CompareResult.MoreThan
             else -> CompareResult.NonComparable
         }
+
+        override val size: Int = 4
     }
 }

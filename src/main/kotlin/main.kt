@@ -20,6 +20,6 @@ fun main(args: Array<String>) {
         println(cfg.toString())
     }
 
-    val parityFullLattice: Lattice<Set<List<Parity>>> = PowerSetLattice()
+    val parityFullLattice: Lattice<Set<List<Parity>>> = PowerSetLattice(DisjointLattice(Parity, program.variables.size))
 
 }
