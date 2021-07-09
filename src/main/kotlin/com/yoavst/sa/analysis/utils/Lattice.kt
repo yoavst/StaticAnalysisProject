@@ -1,6 +1,6 @@
 package com.yoavst.sa.analysis.utils
 
-import java.math.BigInteger
+import kotlin.math.log2
 
 interface Lattice<T> {
     val bottom: T
@@ -8,37 +8,129 @@ interface Lattice<T> {
     fun gcd(item1: T, item2: T): T
     fun lcm(item1: T, item2: T): T
     fun compare(item1: T, item2: T): CompareResult
+
+    /** The size of the lattice or null if too big or infinity **/
     val size: Int?
+
+    // some syntactic sugar
+
+    @Suppress("INAPPLICABLE_JVM_NAME")
+    @JvmName("gcd1")
+    infix fun T.gcd(t: T) = gcd(this, t)
+
+    @Suppress("INAPPLICABLE_JVM_NAME")
+    @JvmName("lcm1")
+    infix fun T.lcm(t: T) = lcm(this, t)
+
+    @Suppress("INAPPLICABLE_JVM_NAME")
+    @JvmName("compare1")
+    infix fun T.compare(t: T) = compare(this, t)
 }
 
 enum class CompareResult {
     LessThan, Equal, MoreThan, NonComparable
 }
 
+fun CompareResult.isLessThanOrEqual() = this == CompareResult.Equal || this == CompareResult.LessThan
+
 fun <T> Lattice<T>.lcmEx(vararg ts: T) = ts.reduce(::lcm)
 fun <T> Lattice<T>.lcmEx(ts: List<T>) = ts.reduce(::lcm)
 fun <T> Lattice<T>.gcdEx(vararg ts: T) = ts.reduce(::gcd)
 fun <T> Lattice<T>.gcdEx(ts: List<T>) = ts.reduce(::gcd)
 
-class DisjointLattice<T>(private val lattice: Lattice<T>, private val dimension: Int) : Lattice<List<T>> {
-    init {
-        assert(dimension >= 1) { "Dimension must be greater than 1" }
+data class DisjointItem<K, T>(val defaultValue: T, val map: Map<K, T> = emptyMap()) {
+    operator fun get(key: K) = map.getOrDefault(key, defaultValue)
+
+    override fun toString(): String = if (map.isEmpty()) "{$defaultValue}" else "$map"
+}
+
+fun <K, T> DisjointItem<K, T>.updateKey(key: K, value: T): DisjointItem<K, T> = when {
+    this[key] == value -> this
+    value == defaultValue && key in map -> {
+        DisjointItem(defaultValue, map - key)
+    }
+    else -> {
+        DisjointItem(defaultValue, map + (key to value))
+    }
+}
+
+class DisjointLattice<T, K>(private val lattice: Lattice<T>, private val variablesCount: Int) :
+    Lattice<DisjointItem<K, T>> {
+    override val bottom: DisjointItem<K, T> = DisjointItem(lattice.bottom)
+    override val top: DisjointItem<K, T> = DisjointItem(lattice.top)
+    override val size: Int? = when {
+        lattice.size == null -> null
+        log2(lattice.size!!.toDouble()) * variablesCount >= 25 -> null
+        else -> lattice.size!!.toBigInteger().pow(variablesCount).toInt()
     }
 
-    override val bottom: List<T> = List(dimension) { lattice.bottom }
-    override val top: List<T> = List(dimension) { lattice.top }
+    override fun gcd(item1: DisjointItem<K, T>, item2: DisjointItem<K, T>): DisjointItem<K, T> = with(lattice) {
+        if (item1 === item2) return@with item1
+        // first, gcd their default value
+        val newDefault = item1.defaultValue gcd item2.defaultValue
 
-    override fun gcd(item1: List<T>, item2: List<T>): List<T> = List(dimension) { lattice.gcd(item1[it], item2[it]) }
+        // then, merge the maps
+        when {
+            item1.map.isEmpty() -> DisjointItem(newDefault, item2.map)
+            item2.map.isEmpty() -> DisjointItem(newDefault, item1.map)
+            else -> {
+                val joinedMap = mutableMapOf<K, T>()
+                for ((key, value) in item1.map) {
+                    val otherValue = item2[key]
+                    val newValue = value gcd otherValue
+                    if (newValue != newDefault)
+                        joinedMap[key] = newValue
+                }
+                for ((key, value) in item2.map) {
+                    if (value != newDefault)
+                        joinedMap.computeIfAbsent(key) { value }
+                }
+                DisjointItem(newDefault, joinedMap)
+            }
+        }
+    }
 
-    override fun lcm(item1: List<T>, item2: List<T>): List<T> = List(dimension) { lattice.lcm(item1[it], item2[it]) }
+    override fun lcm(item1: DisjointItem<K, T>, item2: DisjointItem<K, T>): DisjointItem<K, T> = with(lattice) {
+        if (item1 === item2) return item1
+        // first, lcm their default value
+        val newDefault = item1.defaultValue lcm item2.defaultValue
 
-    override fun compare(item1: List<T>, item2: List<T>): CompareResult {
-        var res = lattice.compare(item1[0], item2[0])
+        // then, merge the maps
+        when {
+            item1.map.isEmpty() -> DisjointItem(newDefault, item2.map)
+            item2.map.isEmpty() -> DisjointItem(newDefault, item1.map)
+            else -> {
+                val joinedMap = mutableMapOf<K, T>()
+                for ((key, value) in item1.map) {
+                    val otherValue = item2[key]
+                    val newValue = value lcm otherValue
+                    if (newValue != newDefault)
+                        joinedMap[key] = newValue
+                }
+                for ((key, value) in item2.map) {
+                    if (value != newDefault)
+                        joinedMap.computeIfAbsent(key) { value }
+                }
+                DisjointItem(newDefault, joinedMap)
+            }
+        }
+    }
+
+    override fun compare(item1: DisjointItem<K, T>, item2: DisjointItem<K, T>): CompareResult = with(lattice) {
+        if (item1 === item2) return CompareResult.Equal
+
+        // first, check if need to compare default
+        var res = CompareResult.Equal
+        if (size != null && item1.map.size != size && item2.map.size != size) {
+            res = item1.defaultValue compare item2.defaultValue
+        }
+
         if (res == CompareResult.NonComparable)
             return CompareResult.NonComparable
 
-        for ((i1, i2) in item1.asSequence().zip(item2.asSequence())) {
-            val curRes = lattice.compare(i1, i2)
+        // then check elements from item1
+        for ((key, value) in item1.map) {
+            val curRes = lattice.compare(value, item2[key])
             when {
                 curRes == CompareResult.NonComparable -> return CompareResult.NonComparable
                 res == curRes || curRes == CompareResult.Equal -> {
@@ -50,72 +142,84 @@ class DisjointLattice<T>(private val lattice: Lattice<T>, private val dimension:
                 else -> return CompareResult.NonComparable
             }
         }
+
+        // and now from item2
+        if (size == null || item2.map.size != size) {
+            for ((key, value) in item2.map) {
+                val curRes = lattice.compare(item1[key], value)
+                when {
+                    curRes == CompareResult.NonComparable -> return CompareResult.NonComparable
+                    res == curRes || curRes == CompareResult.Equal -> {
+                    }
+                    res == CompareResult.Equal -> {
+                        // no longer equal, but less/greater
+                        res = curRes
+                    }
+                    else -> return CompareResult.NonComparable
+                }
+            }
+        }
+
         return res
     }
-
-    override val size: Int? = lattice.size?.let { it * dimension }
 }
 
-private class TopSet<T> : Set<T> {
-    override val size: Int
-        get() = error("Should not call this method on top set")
-
-    override fun contains(element: T): Boolean = error("Should not call this method on top set")
-
-    override fun containsAll(elements: Collection<T>): Boolean = error("Should not call this method on top set")
-
-    override fun isEmpty(): Boolean = error("Should not call this method on top set")
-
-    override fun iterator(): Iterator<T> = error("Should not call this method on top set")
-    override fun equals(other: Any?): Boolean = error("Should not call this method on top set")
-    override fun hashCode(): Int = error("Should not call this method on top set")
+class SuperSetItem<T>(val isBottom: Boolean, val data: Set<T>) {
+    override fun toString(): String = if (isBottom) "Bottom" else if (isTop()) "Top" else data.toString()
+    fun isTop() = !isBottom && data.isEmpty()
 }
 
+/**
+ * Every element is of the form {s ⊆ T | φ(s) }, where:
+ * 1. T is a constraints lattice
+ *  a. Top is no constraints
+ *  b. Bottom is all constraints - invalid
+ *  c. x < y if x is y plus more constraints.
+ *  2. φ is represented by {t_1, ..., t_n }, and equals to (t_1(s) || ... || t_n(s))
+ */
+class SupersetLattice<T>(val lattice: Lattice<T>) : Lattice<SuperSetItem<T>> {
+    override val bottom: SuperSetItem<T> = SuperSetItem(true, emptySet())
+    override val top: SuperSetItem<T> = SuperSetItem(false, emptySet())
 
-class PowerSetLattice<T>(private val lattice: Lattice<T>) : Lattice<Set<T>> {
-    override val bottom: Set<T> = emptySet()
-
-    /* We'll treat this special ref as the top */
-    override val top: Set<T> = TopSet()
-
-    override val size: Int? by lazy {
-        if (lattice.size == null)
-            null
-        else BigInteger("2").pow(lattice.size!!).toInt()
+    override val size: Int? = when {
+        lattice.size == null -> null
+        lattice.size!!.toDouble() >= 25 -> null
+        else -> 2.toBigInteger().pow(lattice.size!!).toInt()
+    }
+    /** lcm over constraints is union of the constraints **/
+    override fun lcm(item1: SuperSetItem<T>, item2: SuperSetItem<T>): SuperSetItem<T> = when {
+        item1.isTop() || item2.isTop() -> top
+        isExtendedBottom(item1) -> item2
+        isExtendedBottom(item2) -> item1
+        else -> SuperSetItem(false, item1.data + item2.data)
     }
 
-    override fun gcd(item1: Set<T>, item2: Set<T>): Set<T> = when {
-        isTop(item1) -> item2
-        isTop(item2) -> item1
-        else -> item1.intersect(item2)
+    override fun gcd(item1: SuperSetItem<T>, item2: SuperSetItem<T>): SuperSetItem<T> = when {
+        item1.isTop() -> item2
+        item2.isTop() -> item1
+        isExtendedBottom(item1) || isExtendedBottom(item2) -> bottom
+        else -> SuperSetItem(false, item1.data.intersect(item2.data))
     }
 
-    override fun lcm(item1: Set<T>, item2: Set<T>): Set<T> = when {
-        isTop(item1) -> item1
-        isTop(item2) -> item2
-        else -> item1.intersect(item2)
-    }
+    override fun compare(item1: SuperSetItem<T>, item2: SuperSetItem<T>): CompareResult = when {
+        item1.isTop() -> if (item2.isTop()) CompareResult.Equal else CompareResult.MoreThan
+        item2.isTop() -> CompareResult.LessThan
+        isExtendedBottom(item1) -> if (isExtendedBottom(item2)) CompareResult.Equal else CompareResult.LessThan
+        isExtendedBottom(item2) -> CompareResult.MoreThan
+        else -> {
+            val firstContainsSecond = item1.data.containsAll(item2.data)
+            val secondContainsFirst = item2.data.containsAll(item1.data)
 
-    override fun compare(item1: Set<T>, item2: Set<T>): CompareResult {
-        if (isTop(item1)) {
-            return if (isTop(item2)) CompareResult.Equal else CompareResult.MoreThan
-        } else if (isTop(item2)) {
-            return CompareResult.LessThan
-        }
-
-        val firstContainsSecond = item1.containsAll(item2)
-        val secondContainsFirst = item2.containsAll(item1)
-
-        return when {
-            firstContainsSecond && secondContainsFirst -> CompareResult.Equal
-            firstContainsSecond -> CompareResult.MoreThan
-            secondContainsFirst -> CompareResult.LessThan
-            else -> CompareResult.NonComparable
+            when {
+                firstContainsSecond && secondContainsFirst -> CompareResult.Equal
+                firstContainsSecond -> CompareResult.MoreThan
+                secondContainsFirst -> CompareResult.LessThan
+                else -> CompareResult.NonComparable
+            }
         }
     }
 
-    fun isTop(item: Set<T>): Boolean = item is TopSet<*> || item.size == size
+    fun getBaseTop() = lattice.top
 
-
+    fun isExtendedBottom(item: SuperSetItem<T>) = item.isBottom || (size != null && item.data.size == size)
 }
-

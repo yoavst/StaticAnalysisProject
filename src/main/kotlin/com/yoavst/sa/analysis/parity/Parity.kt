@@ -1,4 +1,4 @@
-package com.yoavst.sa.analysis
+package com.yoavst.sa.analysis.parity
 
 import com.yoavst.sa.analysis.utils.CompareResult
 import com.yoavst.sa.analysis.utils.Lattice
@@ -33,6 +33,8 @@ enum class Parity {
             item1 == Unknown || item2 == Bottom -> CompareResult.MoreThan
             else -> CompareResult.NonComparable
         }
+
+        fun fromIsEven(isEven: Boolean) = if (isEven) Parity.Even else Odd
 
         override val size: Int = 4
     }

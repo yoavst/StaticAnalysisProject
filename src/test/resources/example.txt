@@ -9,5 +9,3 @@ L4 i := j + 1 L5
 L5 j := i L3
 L6 skip L7
 L7 assert (ODD i ODD j) (EVEN i EVEN j) L8
-L8 assert (SUM i j = SUM j n) L9
-L9 skip L10
