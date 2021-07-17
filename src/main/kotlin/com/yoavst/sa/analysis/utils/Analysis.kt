@@ -6,7 +6,7 @@ import com.yoavst.sa.parsing.ASTStatement
 abstract class Analysis<T>(val lattice: Lattice<T>) {
     abstract fun transfer(statement: ASTStatement, state: T): T
 
-    inline fun join(vararg states: T) = lattice.lcmEx(*states)
+    fun join(vararg states: T) = lattice.lcmEx(*states)
 
-    abstract fun checkAssertions(assertion: List<List<ASTAssertion>>, state: T): Boolean
+    abstract fun checkAssertions(assertion: List<List<ASTAssertion>>, state: T): Boolean?
 }

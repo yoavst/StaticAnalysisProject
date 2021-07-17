@@ -1,16 +1,11 @@
 package com.yoavst.sa.analysis.utils
 
-import kotlin.math.log2
-
 interface Lattice<T> {
     val bottom: T
     val top: T
     fun gcd(item1: T, item2: T): T
     fun lcm(item1: T, item2: T): T
     fun compare(item1: T, item2: T): CompareResult
-
-    /** The size of the lattice or null if too big or infinity **/
-    val size: Int?
 
     // some syntactic sugar
 
@@ -54,15 +49,10 @@ fun <K, T> DisjointItem<K, T>.updateKey(key: K, value: T): DisjointItem<K, T> = 
     }
 }
 
-class DisjointLattice<T, K>(private val lattice: Lattice<T>, private val variablesCount: Int) :
+class DisjointLattice<T, K>(private val lattice: Lattice<T>) :
     Lattice<DisjointItem<K, T>> {
     override val bottom: DisjointItem<K, T> = DisjointItem(lattice.bottom)
     override val top: DisjointItem<K, T> = DisjointItem(lattice.top)
-    override val size: Int? = when {
-        lattice.size == null -> null
-        log2(lattice.size!!.toDouble()) * variablesCount >= 25 -> null
-        else -> lattice.size!!.toBigInteger().pow(variablesCount).toInt()
-    }
 
     override fun gcd(item1: DisjointItem<K, T>, item2: DisjointItem<K, T>): DisjointItem<K, T> = with(lattice) {
         if (item1 === item2) return@with item1
@@ -121,9 +111,6 @@ class DisjointLattice<T, K>(private val lattice: Lattice<T>, private val variabl
 
         // first, check if need to compare default
         var res = CompareResult.Equal
-        if (size != null && item1.map.size != size && item2.map.size != size) {
-            res = item1.defaultValue compare item2.defaultValue
-        }
 
         if (res == CompareResult.NonComparable)
             return CompareResult.NonComparable
@@ -144,19 +131,17 @@ class DisjointLattice<T, K>(private val lattice: Lattice<T>, private val variabl
         }
 
         // and now from item2
-        if (size == null || item2.map.size != size) {
-            for ((key, value) in item2.map) {
-                val curRes = lattice.compare(item1[key], value)
-                when {
-                    curRes == CompareResult.NonComparable -> return CompareResult.NonComparable
-                    res == curRes || curRes == CompareResult.Equal -> {
-                    }
-                    res == CompareResult.Equal -> {
-                        // no longer equal, but less/greater
-                        res = curRes
-                    }
-                    else -> return CompareResult.NonComparable
+        for ((key, value) in item2.map) {
+            val curRes = lattice.compare(item1[key], value)
+            when {
+                curRes == CompareResult.NonComparable -> return CompareResult.NonComparable
+                res == curRes || curRes == CompareResult.Equal -> {
                 }
+                res == CompareResult.Equal -> {
+                    // no longer equal, but less/greater
+                    res = curRes
+                }
+                else -> return CompareResult.NonComparable
             }
         }
 
@@ -181,31 +166,27 @@ class SupersetLattice<T>(val lattice: Lattice<T>) : Lattice<SuperSetItem<T>> {
     override val bottom: SuperSetItem<T> = SuperSetItem(true, emptySet())
     override val top: SuperSetItem<T> = SuperSetItem(false, emptySet())
 
-    override val size: Int? = when {
-        lattice.size == null -> null
-        lattice.size!!.toDouble() >= 25 -> null
-        else -> 2.toBigInteger().pow(lattice.size!!).toInt()
-    }
+
     /** lcm over constraints is union of the constraints **/
     override fun lcm(item1: SuperSetItem<T>, item2: SuperSetItem<T>): SuperSetItem<T> = when {
         item1.isTop() || item2.isTop() -> top
-        isExtendedBottom(item1) -> item2
-        isExtendedBottom(item2) -> item1
+        item1.isBottom -> item2
+        item2.isBottom -> item1
         else -> SuperSetItem(false, item1.data + item2.data)
     }
 
     override fun gcd(item1: SuperSetItem<T>, item2: SuperSetItem<T>): SuperSetItem<T> = when {
         item1.isTop() -> item2
         item2.isTop() -> item1
-        isExtendedBottom(item1) || isExtendedBottom(item2) -> bottom
+        item1.isBottom || item2.isBottom -> bottom
         else -> SuperSetItem(false, item1.data.intersect(item2.data))
     }
 
     override fun compare(item1: SuperSetItem<T>, item2: SuperSetItem<T>): CompareResult = when {
         item1.isTop() -> if (item2.isTop()) CompareResult.Equal else CompareResult.MoreThan
         item2.isTop() -> CompareResult.LessThan
-        isExtendedBottom(item1) -> if (isExtendedBottom(item2)) CompareResult.Equal else CompareResult.LessThan
-        isExtendedBottom(item2) -> CompareResult.MoreThan
+        item1.isBottom -> if (item2.isBottom) CompareResult.Equal else CompareResult.LessThan
+        item2.isBottom -> CompareResult.MoreThan
         else -> {
             val firstContainsSecond = item1.data.containsAll(item2.data)
             val secondContainsFirst = item2.data.containsAll(item1.data)
@@ -220,6 +201,4 @@ class SupersetLattice<T>(val lattice: Lattice<T>) : Lattice<SuperSetItem<T>> {
     }
 
     fun getBaseTop() = lattice.top
-
-    fun isExtendedBottom(item: SuperSetItem<T>) = item.isBottom || (size != null && item.data.size == size)
 }

@@ -35,7 +35,5 @@ enum class Parity {
         }
 
         fun fromIsEven(isEven: Boolean) = if (isEven) Parity.Even else Odd
-
-        override val size: Int = 4
     }
 }

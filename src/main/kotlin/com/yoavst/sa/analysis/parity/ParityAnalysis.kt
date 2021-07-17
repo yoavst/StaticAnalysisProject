@@ -15,8 +15,7 @@ import java.math.BigInteger
 private typealias InnerState = DisjointItem<String, Parity>
 private typealias State = SuperSetItem<InnerState>
 
-class ParityAnalysis(variablesCount: Int) :
-    Analysis<State>(SupersetLattice(DisjointLattice(Parity, variablesCount))) {
+object ParityAnalysis : Analysis<State>(SupersetLattice(DisjointLattice(Parity))) {
     private val typedLattice = (lattice as SupersetLattice<InnerState>)
 
     override fun transfer(statement: ASTStatement, state: State): State {
@@ -56,7 +55,7 @@ class ParityAnalysis(variablesCount: Int) :
         }
 
         if (assumption.value is ConstValue) {
-            val expected = Parity.fromIsEven(assumption.value.value.isEven())
+            val expected = fromIsEven(assumption.value.value.isEven())
             val variableName = assumption.variableName
             val newStates = mutableSetOf<InnerState>()
             // now go over each state, and check if it can match the assumption.
@@ -135,7 +134,7 @@ class ParityAnalysis(variablesCount: Int) :
     }
 
     private fun updateStateFromAstValue(fullState: State, variable: String, value: ASTValue): State {
-        if (typedLattice.isExtendedBottom(fullState)) {
+        if (fullState.isBottom) {
             // If the state before was bottom, assigning a variable will still keep it bottom.
             return fullState
         }
@@ -150,7 +149,7 @@ class ParityAnalysis(variablesCount: Int) :
 
         return State(false, baseState.data.flatMapTo(mutableSetOf()) { state ->
             when (value) {
-                is ConstValue -> listOf(state.updateKey(variable, Parity.fromIsEven(value.value.isEven())))
+                is ConstValue -> listOf(state.updateKey(variable, fromIsEven(value.value.isEven())))
                 UnknownValue -> listOf(state.updateKey(variable, Unknown))
                 else -> {
                     val otherVariableName: String
@@ -171,20 +170,20 @@ class ParityAnalysis(variablesCount: Int) :
                             // assigning bottom to variable
                             listOf(state.updateKey(variable, Bottom))
                         }
-                        Even -> listOf(state.updateKey(variable, Parity.fromIsEven(isSameSign)))
-                        Odd -> listOf(state.updateKey(variable, Parity.fromIsEven(!isSameSign)))
+                        Even -> listOf(state.updateKey(variable, fromIsEven(isSameSign)))
+                        Odd -> listOf(state.updateKey(variable, fromIsEven(!isSameSign)))
                         Unknown -> {
-                            // here it becomes complicated, as we need to make a connection between the values of the two variables
-                            if (isSameSign)
-                                listOf(
+                            when {
+                                // here it becomes complicated, as we need to make a connection between the values of the two variables
+                                isSameSign -> listOf(
                                     state.updateKey(variable, Even).updateKey(otherVariableName, Even),
                                     state.updateKey(variable, Odd).updateKey(otherVariableName, Odd)
                                 )
-                            else
-                                listOf(
+                                else -> listOf(
                                     state.updateKey(variable, Even).updateKey(otherVariableName, Odd),
                                     state.updateKey(variable, Odd).updateKey(otherVariableName, Even)
                                 )
+                            }
                         }
                     }
                 }
@@ -194,7 +193,7 @@ class ParityAnalysis(variablesCount: Int) :
 
     private fun reduce(fullState: State): State {
         // cannot reduce top or bottom
-        if (typedLattice.isExtendedBottom(fullState) || fullState.isTop())
+        if (fullState.isBottom || fullState.isTop())
             return fullState
 
         // we'll do a n**2 reducing. maybe we can do this better?
@@ -213,13 +212,14 @@ class ParityAnalysis(variablesCount: Int) :
         } else State(false, newStates)
     }
 
-    override fun checkAssertions(assertion: List<List<ASTAssertion>>, state: State): Boolean {
+    override fun checkAssertions(assertion: List<List<ASTAssertion>>, state: State): Boolean? {
+        // bottom fulfill any assertion
         if (state.isBottom)
-            return false
+            return true
 
         if (assertion.any { sub -> sub.any { it is ASTAssertion.SumAssertion } }) {
             // sum assertion is not supported
-            return false
+            return null
         }
         @Suppress("UNCHECKED_CAST")
         assertion as List<List<ASTAssertion.ParityAssertion>>
@@ -229,7 +229,11 @@ class ParityAnalysis(variablesCount: Int) :
         }
 
         val assertionsAsState = assertion.map { it.toState() }
-        return state.data.all { possibleState -> assertionsAsState.any { typedLattice.lattice.compare(possibleState, it).isLessThanOrEqual() }}
+        return state.data.all { possibleState ->
+            assertionsAsState.any {
+                typedLattice.lattice.compare(possibleState, it).isLessThanOrEqual()
+            }
+        }
 
     }
 

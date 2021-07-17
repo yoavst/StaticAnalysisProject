@@ -24,7 +24,7 @@ data class ControlFlowGraph(val startingNode: CFGNode, val tree: List<CFGNode>) 
         appendLine("digraph {")
         for (node in tree) {
             if (node.value != null) {
-                appendLine("\tL${node.id} [label=\"${node.value.toString().replace('"', '\'')}\"];")
+                appendLine("\tL${node.id} [label=\"${node.value.toString().replace('"', '\'').replace("\n", "\\n")}\"];")
             }
             for (edge in node.outEdges) {
                 appendLine("\tL${node.id} -> L${edge.second.id} [label=\"${
