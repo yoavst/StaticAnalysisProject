@@ -27,6 +27,7 @@ enum class CompareResult {
 }
 
 fun CompareResult.isLessThanOrEqual() = this == CompareResult.Equal || this == CompareResult.LessThan
+fun CompareResult.isMoreThanOrEqual() = this == CompareResult.Equal || this == CompareResult.MoreThan
 
 fun <T> Lattice<T>.lcmEx(vararg ts: T) = ts.reduce(::lcm)
 fun <T> Lattice<T>.lcmEx(ts: List<T>) = ts.reduce(::lcm)
@@ -201,4 +202,32 @@ class SupersetLattice<T>(val lattice: Lattice<T>) : Lattice<SuperSetItem<T>> {
     }
 
     fun getBaseTop() = lattice.top
+}
+
+class PairLattice<T, U>(private val lattice1: Lattice<T>, private val lattice2: Lattice<U>) : Lattice<Pair<T, U>> {
+    override val bottom: Pair<T, U>
+        get() = lattice1.bottom to lattice2.bottom
+    override val top: Pair<T, U>
+        get() = lattice1.top to lattice2.top
+
+    override fun gcd(item1: Pair<T, U>, item2: Pair<T, U>): Pair<T, U> =
+        lattice1.gcd(item1.first, item2.first) to lattice2.gcd(item1.second, item2.second)
+
+    override fun lcm(item1: Pair<T, U>, item2: Pair<T, U>): Pair<T, U> =
+        lattice1.lcm(item1.first, item2.first) to lattice2.lcm(item1.second, item2.second)
+
+    override fun compare(item1: Pair<T, U>, item2: Pair<T, U>): CompareResult {
+        // compare first by first coordinate, then second.
+        val r1 = lattice1.compare(item1.first, item2.first)
+        val r2 = lattice2.compare(item1.second, item2.second)
+
+        return when {
+            r1 == r2 -> r1
+            r1.isLessThanOrEqual() && r2.isLessThanOrEqual() -> CompareResult.LessThan
+            r1.isMoreThanOrEqual() && r2.isMoreThanOrEqual() -> CompareResult.MoreThan
+            else -> CompareResult.NonComparable
+        }
+
+    }
+
 }

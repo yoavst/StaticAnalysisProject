@@ -73,12 +73,7 @@ class VariableRelations private constructor(val isBottom: Boolean, val matrix: I
                         // return sp{B, C, v-w} + 1/2(v+w)
                         val v = item1.matrix.backSubstitute()!!
                         val w = item2.matrix.backSubstitute()!!
-                        // now, there is a case that B+v is actually B. So yes, we need to check that.
-//                        if (compare(from(plusOf(emptyList(), listOf(listOf(v)))), from(B)).isLessThanOrEqual()) {
-//                            // return sp{B, C, w} instead
-//                            from((plusOf(listOf(B, C), listOf(listOf(w))) as IMatrix.Matrix).toAffine(v))
-//                        } else
-//                            from((plusOf(listOf(B, C), listOf(listOf(v))) as IMatrix.Matrix).toAffine(w))
+
                         from(when(val resultMat = plusOf(listOf(B, C), listOf(listOf(v - w)))) {
                             is IMatrix.Matrix -> resultMat.toAffine((v + w) * Fraction(1,2))
                             IMatrix.Zero -> IMatrix.Zero

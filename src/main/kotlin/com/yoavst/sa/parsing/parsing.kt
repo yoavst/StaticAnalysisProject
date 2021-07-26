@@ -35,7 +35,7 @@ class ASTParser : Grammar<ASTProgram>() {
     private val constValueParser by constValue use { BigInteger(text) }
     private val variableParser by variable use { text }
     private val vertexParser by vertex use { BigInteger(text.substring(1)) }
-    private val opParser by (plus asJust ASTOperation.Plus) or (plus asJust ASTOperation.Minus)
+    private val opParser by (plus asJust ASTOperation.Plus) or (minus asJust ASTOperation.Minus)
     private val equalParser by (equal asJust true) or (notEqual asJust false)
     private val sumParser by -sum * oneOrMore(variableParser)
 
@@ -43,8 +43,7 @@ class ASTParser : Grammar<ASTProgram>() {
     ((variableParser * opParser * constValueParser).map { (var1, op, var2) ->
         ASTValue.VariableOpConstValue(
             var1,
-            op,
-            var2
+            if (op == ASTOperation.Plus) var2 else -var2
         )
     }) or
             variableParser.map(ASTValue::VariableValue) or

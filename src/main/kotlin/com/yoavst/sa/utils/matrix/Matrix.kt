@@ -281,13 +281,23 @@ fun plusOf(matrices: List<IMatrix.Matrix>, kernels: List<List<Vector>> = emptyLi
 }
 
 fun IMatrix.Matrix.toAffine(solution: Vector): IMatrix.Matrix = IMatrix.Matrix(Array(rows) { i ->
-        Array(columns + 1) { j ->
-            if (j != columns) this[i, j]
-            else {
-                -row(i).elements.asSequence().mapIndexed { index, value -> solution.elements[index] * value }
-                    .reduce(Fraction::plus)
-            }
+    Array(columns + 1) { j ->
+        if (j != columns) this[i, j]
+        else {
+            -row(i).elements.asSequence().mapIndexed { index, value -> solution.elements[index] * value }
+                .reduce(Fraction::plus)
         }
-    })
+    }
+})
 
 fun IMatrix.Matrix.dropColumn() = IMatrix.Matrix(Array(rows) { i -> Array(columns + -1) { j -> this[i, j] } })
+
+fun IMatrix.convertToWholeNumbers(): IMatrix = when (this) {
+    IMatrix.Zero -> this
+    is IMatrix.Matrix -> IMatrix.Matrix(Array(this.rows) { row ->
+        val lcm = Fraction(entriesReadOnly()[row].fold(1) { lcm, fraction -> Fraction.lcm(lcm, fraction.denominator) })
+        Array(this.columns) { col ->
+            this[row, col] * lcm
+        }
+    })
+}

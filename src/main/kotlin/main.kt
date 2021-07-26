@@ -1,4 +1,7 @@
 import com.github.h0tk3y.betterParse.grammar.parseToEnd
+import com.yoavst.sa.analysis.combined.JoinedAnalysis
+import com.yoavst.sa.analysis.combined.SumAnalysisWithParitySupport
+import com.yoavst.sa.analysis.sum.HomogenousSumAnalysis
 import com.yoavst.sa.analysis.sum.SumAnalysis
 import com.yoavst.sa.analysis.sum.VariableRelations
 import com.yoavst.sa.analysis.utils.AnalysisRunner
@@ -14,7 +17,7 @@ import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
 //    test()
-    val programRaw = File("src/test/resources/sum/for_i_in_range_10000.txt").readText()
+    val programRaw = File("src/test/resources/sum/i_plus_i.txt").readText()
 
     val parser = ASTParser()
     val program = parser.parseToEnd(programRaw)
@@ -24,7 +27,8 @@ fun main(args: Array<String>) {
     val mapping = program.variables.withIndex().associate { (ind, value) -> value to ind }
     println(mapping)
 
-    val analysisRunner = AnalysisRunner(cfg, SumAnalysis(mapping))
+    // SumAnalysisWithParitySupport(SumAnalysis(mapping))
+    val analysisRunner = AnalysisRunner(cfg, SumAnalysisWithParitySupport(HomogenousSumAnalysis(mapping)))
 
     analysisRunner.run()
 

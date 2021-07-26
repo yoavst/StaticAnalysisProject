@@ -15,8 +15,8 @@ import java.math.BigInteger
 private typealias InnerState = DisjointItem<String, Parity>
 private typealias State = SuperSetItem<InnerState>
 
-object ParityAnalysis : Analysis<State>(SupersetLattice(DisjointLattice(Parity))) {
-    private val typedLattice = (lattice as SupersetLattice<InnerState>)
+object ParityAnalysis : Analysis<State> {
+    override val lattice: SupersetLattice<InnerState> = SupersetLattice(DisjointLattice(Parity))
 
     override fun transfer(statement: ASTStatement, state: State): State {
         return when (statement) {
@@ -142,7 +142,7 @@ object ParityAnalysis : Analysis<State>(SupersetLattice(DisjointLattice(Parity))
         val baseState = when {
             fullState.isTop() -> {
                 // since {} == {()}, we can replace them so the code will work
-                State(false, setOf(typedLattice.getBaseTop()))
+                State(false, setOf(lattice.getBaseTop()))
             }
             else -> fullState
         }
@@ -200,13 +200,13 @@ object ParityAnalysis : Analysis<State>(SupersetLattice(DisjointLattice(Parity))
         val newStates = fullState.data.filterTo(mutableSetOf()) { state ->
             fullState.data.all {
                 if (state !== it) {
-                    val comparisonResult = typedLattice.lattice.compare(state, it)
+                    val comparisonResult = lattice.lattice.compare(state, it)
                     comparisonResult == CompareResult.NonComparable || comparisonResult == CompareResult.MoreThan
                 } else true
             }
         }
 
-        return if (newStates.size == 1 && newStates.toList()[0] == typedLattice.lattice.top) {
+        return if (newStates.size == 1 && newStates.toList()[0] == lattice.lattice.top) {
             // we merge the {()} with {}
             State(false, emptySet())
         } else State(false, newStates)
@@ -231,7 +231,7 @@ object ParityAnalysis : Analysis<State>(SupersetLattice(DisjointLattice(Parity))
         val assertionsAsState = assertion.map { it.toState() }
         return state.data.all { possibleState ->
             assertionsAsState.any {
-                typedLattice.lattice.compare(possibleState, it).isLessThanOrEqual()
+                lattice.lattice.compare(possibleState, it).isLessThanOrEqual()
             }
         }
 

@@ -1,0 +1,9 @@
+i n
+
+L0 i := 0 L1
+L1 n := ? L2
+L2 assume (i != n) L3
+L3 i := i + 2 L4
+L4 n := n + 1 L2
+L2 assume (i = n) L5
+L5 skip L6

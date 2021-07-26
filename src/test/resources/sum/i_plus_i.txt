@@ -1,0 +1,10 @@
+i j n
+
+L0 n := ? L1
+L1 i := n L2
+L2 j := n L3
+L3 assume (i != 0) L4
+L4 i := i - 1 L5
+L5 j := j + 1 L3
+L3 assume (i = 0) L6
+L6 assert (SUM j = SUM n n) L7

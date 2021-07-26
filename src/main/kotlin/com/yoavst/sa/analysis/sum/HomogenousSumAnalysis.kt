@@ -1,6 +1,5 @@
 package com.yoavst.sa.analysis.sum
 
-import com.yoavst.sa.analysis.utils.Analysis
 import com.yoavst.sa.analysis.utils.Lattice
 import com.yoavst.sa.analysis.utils.isLessThanOrEqual
 import com.yoavst.sa.parsing.ASTAssertion
@@ -12,7 +11,7 @@ import com.yoavst.sa.utils.matrix.IMatrix
 import com.yoavst.sa.utils.matrix.rowAddScale
 import java.math.BigInteger
 
-class SumAnalysis(override val variableToIndex: Map<String, Int>) : VariableRelationAnalysis {
+class HomogenousSumAnalysis(override val variableToIndex: Map<String, Int>) : VariableRelationAnalysis {
     override val lattice: Lattice<VariableRelations> = VariableRelations
     private val oneIndex get() = variableToIndex.size
 
@@ -45,15 +44,20 @@ class SumAnalysis(override val variableToIndex: Map<String, Int>) : VariableRela
     ): VariableRelations {
         if (state.isBottom) return lattice.bottom
         val index = variableToIndex[variable]!!
-        val assignmentState = varEqualValueToState(index, value)
         return when (value) {
             is ASTValue.ConstValue -> {
-                // check if need to do anything
-                if (lattice.compare(state, assignmentState).isLessThanOrEqual()) {
-                    state
+                if (value.value == BigInteger.ZERO) {
+                    val assignmentState = matrixFromEquationTwoVariablesEqual(index, index, Fraction.ONE)
+                    // check if need to do anything
+                    if (lattice.compare(state, assignmentState).isLessThanOrEqual()) {
+                        state
+                    } else {
+                        // need to invalidate the variable and then add the equation
+                        lattice.gcd(removeIndex(state, index), assignmentState)
+                    }
                 } else {
-                    // need to invalidate the variable
-                    lattice.gcd(removeIndex(state, index), assignmentState)
+                    // same as unknown value
+                    removeIndex(state, index)
                 }
             }
             is ASTValue.UnknownValue -> {
@@ -61,38 +65,31 @@ class SumAnalysis(override val variableToIndex: Map<String, Int>) : VariableRela
                 removeIndex(state, index)
             }
             is ASTValue.VariableOpConstValue -> {
-                if (assignmentState.isTop) {
+                val otherVariableIndex = variableToIndex[value.variableName]!!
+                if (otherVariableIndex == index) {
                     // same variable: V_ind := V_ind + C|0
                     if (value.const == BigInteger.ZERO || state.isTop) {
                         // V_ind := V_ind
                         state
                     } else {
-                        // V_ind := V_ind + C
-                        // update the rows
-                        state.matrix as IMatrix.Matrix
-                        val rowIndex = state.matrix.entriesReadOnly().indexOfFirst { it[index] != Fraction.ZERO }
-                        if (rowIndex == -1) {
-                            // the index is not part of any equation (can have any value without influencing the others)
-                            state
-                        } else {
-                            val data = state.matrix.entriesCopy()
-                            for (row in data) {
-                                row[oneIndex] -= row[index] * Fraction(value.const.toInt())
-                            }
-                            VariableRelations.from(IMatrix.Matrix(data))
-                        }
+                        // Invalidate the variable
+                        removeIndex(state, index)
                     }
+                } else if (value.const != BigInteger.ZERO) {
+                    // Invalidate the variable
+                    removeIndex(state, index)
                 } else {
-                    // V_ind := V_other + C|0
-                    propagateEquality(state, index, assignmentState)
+                    // V_ind := V_other
+                    propagateEquality(state, index, otherVariableIndex)
                 }
             }
             is ASTValue.VariableValue -> {
+                val otherVariableIndex = variableToIndex[value.variableName]!!
                 // if V := V
-                if (assignmentState.isTop)
+                if (otherVariableIndex == index)
                     state
                 // V := U
-                else propagateEquality(state, index, assignmentState)
+                else propagateEquality(state, index, otherVariableIndex)
             }
         }
     }
@@ -130,8 +127,9 @@ class SumAnalysis(override val variableToIndex: Map<String, Int>) : VariableRela
     private fun propagateEquality(
         state: VariableRelations,
         index: Int,
-        variablesEquality: VariableRelations
+        otherIndex: Int
     ): VariableRelations {
+        val variablesEquality = matrixFromEquationTwoVariablesEqual(index, otherIndex)
         // 1. Check if the equality already is the case
         //    If it is, then nothing needs to be done
         if (lattice.compare(state, variablesEquality).isLessThanOrEqual()) {
@@ -178,35 +176,30 @@ class SumAnalysis(override val variableToIndex: Map<String, Int>) : VariableRela
         }
 
         val newInfo = varEqualValueToState(index, assumption.value)
-        if (newInfo == lattice.top) {
-            // happens in two cases:
-            // 1. V := V
-            // 2. V := V+C
-            // The first case is cool assumption, the second case is bad assumption if C != 0
-            if (assumption.value is ASTValue.VariableOpConstValue && assumption.value.const != BigInteger.ZERO)
-                return lattice.bottom
-            // otherwise we didn't learn any info
-            return state
-        }
-
-        // otherwise, merge the new info
+        // merge the new info
         return lattice.gcd(state, newInfo)
     }
 
     private fun varEqualValueToState(variable: Int, value: ASTValue): VariableRelations = when (value) {
-        is ASTValue.ConstValue ->
-            matrixFromEquationTwoVariablesEqual(variable, oneIndex, -Fraction(value.value.toInt()))
+        is ASTValue.ConstValue -> {
+            // support only zero assignments
+            if (value.value == BigInteger.ZERO)
+                matrixFromEquationTwoVariablesEqual(variable, oneIndex, Fraction.ZERO)
+            else VariableRelations.top
+        }
         ASTValue.UnknownValue -> VariableRelations.top
         is ASTValue.VariableOpConstValue ->
-            if (variable == variableToIndex[value.variableName]) VariableRelations.top else
-                matrixFromEquation {
+            when {
+                value.const != BigInteger.ZERO -> VariableRelations.top
+                variable == variableToIndex[value.variableName] -> VariableRelations.top
+                else -> matrixFromEquation {
                     when (it) {
                         variable -> Fraction.ONE
                         variableToIndex[value.variableName] -> Fraction.MINUS_ONE
-                        oneIndex -> -Fraction(value.const.toInt())
                         else -> Fraction.ZERO
                     }
                 }
+            }
         is ASTValue.VariableValue ->
             if (variable == variableToIndex[value.variableName])
                 VariableRelations.top

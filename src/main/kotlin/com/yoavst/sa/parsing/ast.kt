@@ -27,9 +27,9 @@ sealed interface ASTValue : AST {
     value class ConstValue(val value: BigInteger) : ASTValue, ASTWithNoVariables {
         override fun toString() = "$value"
     }
-    data class VariableOpConstValue(val variableName: String, val op: ASTOperation, val const: BigInteger) : ASTValue {
+    data class VariableOpConstValue(val variableName: String, val const: BigInteger) : ASTValue {
         override val variables: Set<String> get() = setOf(variableName)
-        override fun toString() = "$variableName $op $const"
+        override fun toString() = "$variableName + $const"
     }
 
     object UnknownValue : ASTValue, ASTWithNoVariables {

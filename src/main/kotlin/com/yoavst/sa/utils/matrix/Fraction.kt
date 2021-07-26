@@ -25,6 +25,8 @@ data class Fraction(val numerator: Int, val denominator: Int) : Comparable<Fract
                 gcd(n2, n1 % n2)
             }
         }
+
+        fun lcm(n1: Int, n2: Int) = n1 * n2 / gcd(n1, n2)
     }
 
     private fun simplify(): Fraction {
