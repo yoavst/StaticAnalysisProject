@@ -45,7 +45,7 @@ sealed interface ASTAssumption : AST {
         override fun toString(): String = "False"
     }
     data class VariableAssumption(val variableName: String, val isEqual: Boolean, val value: ASTValue) : ASTAssumption {
-        override val variables: Set<String> get() = setOf(variableName)
+        override val variables: Set<String> get() = setOf(variableName) + value.variables
         override fun toString() = "$variableName ${if (isEqual) "=" else "!="} $value"
     }
 }

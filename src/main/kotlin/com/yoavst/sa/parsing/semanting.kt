@@ -81,7 +81,7 @@ fun ASTProgram.toCFG(): ControlFlowGraph? {
         }
         1 -> startingNodes.values.first()
         else -> {
-            println("Multiple starting node in the graph: ${mapping.keys}")
+            println("Multiple starting node in the graph: ${startingNodes.keys}")
             return null
         }
     }

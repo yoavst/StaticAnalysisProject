@@ -174,7 +174,7 @@ class SumAnalysis(override val variableToIndex: Map<String, Int>) : VariableRela
             return if (!constraints.isTop && lattice.compare(state, constraints).isLessThanOrEqual()) {
                 lattice.bottom
             } else state
-            // otherwise cannot save inequalities
+            // otherwise, cannot save inequalities
         }
 
         val newInfo = varEqualValueToState(index, assumption.value)
@@ -185,7 +185,7 @@ class SumAnalysis(override val variableToIndex: Map<String, Int>) : VariableRela
             // The first case is cool assumption, the second case is bad assumption if C != 0
             if (assumption.value is ASTValue.VariableOpConstValue && assumption.value.const != BigInteger.ZERO)
                 return lattice.bottom
-            // otherwise we didn't learn any info
+            // otherwise, we didn't learn any info
             return state
         }
 
@@ -242,7 +242,7 @@ class SumAnalysis(override val variableToIndex: Map<String, Int>) : VariableRela
         }
     }
 
-    fun List<ASTAssertion.SumAssertion>.toState() = map { (variables1, variables2) ->
+    private fun List<ASTAssertion.SumAssertion>.toState() = map { (variables1, variables2) ->
         val counter = mutableMapOf<Int, Int>().withDefault { 0 }
         for (v in variables1.asSequence()) {
             val vInd = variableToIndex[v]!!

@@ -228,7 +228,7 @@ object ParityAnalysis : Analysis<State> {
             return true
         }
 
-        val assertionsAsState = assertion.map { it.toState() }
+        val assertionsAsState = assertion.mapNotNull { it.toState() }
         return state.data.all { possibleState ->
             assertionsAsState.any {
                 lattice.lattice.compare(possibleState, it).isLessThanOrEqual()
@@ -237,8 +237,12 @@ object ParityAnalysis : Analysis<State> {
 
     }
 
-    private fun List<ASTAssertion.ParityAssertion>.toState() =
-        InnerState(Unknown, this.associate { it.variableName to fromIsEven(it.isEven) })
+    private fun List<ASTAssertion.ParityAssertion>.toState(): InnerState? {
+        // we need to support bottom state meh.
+        if (this.groupBy { it.variableName }.any { it.value.map(ASTAssertion.ParityAssertion::isEven).toSet().size != 1 })
+        return null
+        return InnerState(Unknown, this.associate { it.variableName to fromIsEven(it.isEven) })
+    }
 
 
 }

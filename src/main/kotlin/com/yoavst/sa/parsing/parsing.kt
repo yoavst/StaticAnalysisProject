@@ -10,6 +10,7 @@ import java.math.BigInteger
 class ASTParser : Grammar<ASTProgram>() {
     //region Tokens
     private val ws by regexToken("""\s+""", ignore = true)
+    private val comment by regexToken("""#.+""", ignore = true)
     private val skip by literalToken("skip")
     private val assume by literalToken("assume")
     private val assert by literalToken("assert")
