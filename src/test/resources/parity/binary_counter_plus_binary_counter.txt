@@ -1,0 +1,83 @@
+a b c d w x y z ww xx yy zz
+
+# init first counter
+L1 a := 1 L2
+L2 b := 0 L3
+L3 c := 1 L4
+L4 d := 0 L5
+
+# init second counter
+L5 w := 0 L7
+L7 x := 1 L8
+L8 y := 1 L9
+L9 z := 0 L11
+
+# init addition counter
+L11 ww := 0 L12
+L12 xx := 0 L13
+L13 yy := 0 L14
+L14 zz := 0 L15
+
+# Check if added all
+L15 assume w = ww L16
+L16 assume x = xx L17
+L17 assume y = yy L18
+L18 assume z = zz L1000
+
+L15 assume w != ww L19
+L16 assume x != xx L19
+L17 assume y != yy L19
+L18 assume z != zz L19
+
+# Increment a|b|c|d
+L19 assume a = 0 L100
+L100 a := 1 L30
+
+L19 assume a = 1 L20
+L20 assume b = 0 L200
+L200 b := 1 L201
+L201 a := 0 L30
+
+L20 assume b = 1 L21
+L21 assume c = 0 L300
+L300 c := 1 L301
+L301 b := 0 L302
+L302 a := 0 L30
+
+L21 assume c = 1 L22
+L22 assume d = 0 L400
+L400 d := 1 L401
+L401 c := 0 L402
+L402 b := 0 L403
+L403 a := 0 L30
+
+L22 assume d = 1 L1002
+
+# increment ww|xx|yy|zz
+L30 assume ww = 0 L500
+L500 ww := 1 L60
+
+L30 assume ww = 1 L31
+L31 assume xx = 0 L600
+L600 xx := 1 L601
+L601 ww := 0 L60
+
+L31 assume xx = 1 L32
+L32 assume yy = 0 L700
+L700 yy := 1 L701
+L701 xx := 0 L702
+L702 ww := 0 L60
+
+L32 assume yy = 1 L33
+L33 assume zz = 0 L800
+L800 zz := 1 L801
+L801 yy := 0 L802
+L802 xx := 0 L803
+L803 ww := 0 L60
+
+L33 assume zz = 1 L1002
+
+# increment both a|b|c|d and ww|xx|yy|zz, go to the loop condition
+L60 skip L15
+
+L1000 assert (ODD a ODD b EVEN c ODD d) L1001

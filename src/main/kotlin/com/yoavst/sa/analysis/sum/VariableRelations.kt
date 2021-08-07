@@ -18,7 +18,7 @@ class VariableRelations private constructor(val isBottom: Boolean, val matrix: I
     override fun toString(): String = if (isBottom) "Bottom" else if (dimen == 0) "Top" else "$matrix"
 
     companion object : Lattice<VariableRelations> {
-        fun from(equations: IMatrix): VariableRelations = VariableRelations(false, equations.rrefMinimal())
+        fun from(equations: IMatrix): VariableRelations = fromReduced(equations.rrefMinimal())
         private fun fromReduced(equations: IMatrix) = VariableRelations(false, equations)
 
         override val bottom: VariableRelations = VariableRelations(true, IMatrix.Zero)
@@ -80,7 +80,11 @@ class VariableRelations private constructor(val isBottom: Boolean, val matrix: I
                         })
                     } else {
                         // return (B+C) + intersectionItem
-                        from((plusOf(listOf(B, C)) as IMatrix.Matrix).toAffine(intersectionItem))
+                        when(val BC = plusOf(listOf(B, C))) {
+                            is IMatrix.Matrix ->  from(BC.toAffine(intersectionItem))
+                            IMatrix.Zero -> top
+                        }
+
                     }
                 }
                 IMatrix.Zero -> {

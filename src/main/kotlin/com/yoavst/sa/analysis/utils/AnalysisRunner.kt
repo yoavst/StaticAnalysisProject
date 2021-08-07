@@ -10,7 +10,17 @@ import guru.nidi.graphviz.parse.Parser
 import java.io.File
 
 
-class AnalysisRunner<T>(private val graph: ControlFlowGraph, private val analysis: Analysis<T>) {
+class AnalysisRunner<T>(
+    private val graph: ControlFlowGraph,
+    private val analysis: Analysis<T>,
+    private val shouldPlotStates: Boolean = false,
+    private val shouldPlotFinalState: Boolean = false
+) {
+    init {
+        if (shouldPlotStates || shouldPlotFinalState) {
+            File("graphviz").mkdir()
+        }
+    }
 
     fun run() {
         val lattice = analysis.lattice
@@ -44,10 +54,14 @@ class AnalysisRunner<T>(private val graph: ControlFlowGraph, private val analysi
                     stack.add(nextNode as CFGNode)
                 }
             }
-            if (false) {
+            if (shouldPlotStates) {
                 val g: MutableGraph = Parser().read(graph.toString())
-                Graphviz.fromGraph(g).width(1920).render(Format.PNG).toFile(File("build/img/step-$i.png"))
+                Graphviz.fromGraph(g).render(Format.PNG).toFile(File("graphviz/step-$i.png"))
             }
+        }
+        if (shouldPlotFinalState) {
+            val g: MutableGraph = Parser().read(graph.toString())
+            Graphviz.fromGraph(g).render(Format.PNG).toFile(File("graphviz/step-$i.png"))
         }
         println("Run for $i rounds")
 

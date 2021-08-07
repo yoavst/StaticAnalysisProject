@@ -235,7 +235,7 @@ class HomogenousSumAnalysis(override val variableToIndex: Map<String, Int>) : Va
         }
     }
 
-    fun List<ASTAssertion.SumAssertion>.toState() = map { (variables1, variables2) ->
+    private fun List<ASTAssertion.SumAssertion>.toState() = map { (variables1, variables2) ->
         val counter = mutableMapOf<Int, Int>().withDefault { 0 }
         for (v in variables1.asSequence()) {
             val vInd = variableToIndex[v]!!

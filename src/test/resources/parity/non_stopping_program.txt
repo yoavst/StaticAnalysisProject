@@ -1,0 +1,9 @@
+i n
+
+L0 i := 1 L1
+L1 n := 2 L2
+L2 assume n != i L3
+L3 i := i + 1 L4
+L4 n := n + 1 L2
+L2 assume n = i L5
+L5 assert (EVEN i ODD i) L6

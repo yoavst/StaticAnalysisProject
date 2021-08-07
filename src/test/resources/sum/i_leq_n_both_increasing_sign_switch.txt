@@ -1,10 +1,10 @@
 i n r
 
 L0 i := 0 L1
-L1 n := 10 L2
-L2 r := 20 L3
+L1 n := 20 L2
+L2 r := 30 L3
 L3 assume (i != n) L4
-L4 i := i + 2 L5
+L4 i := i + 3 L5
 L5 n := n + 1 L3
 L3 assume (i = n) L6
 L6 assert (SUM i = SUM r) L7

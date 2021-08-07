@@ -1,0 +1,8 @@
+i n
+
+L0 i := ? L1
+L1 n := 13 L2
+L2 assume n != i L3
+L3 i := i + 1 L2
+L2 assume n = i L4
+L4 assert (ODD i) L5

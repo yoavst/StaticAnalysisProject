@@ -1,0 +1,35 @@
+a b c d n
+
+L0 n := 5 L1
+L1 a := 1 L2
+L2 b := 0 L3
+L3 c := 1 L4
+L4 d := 0 L5
+
+
+L5 assume n != 0 L6
+L6 assume a = 0 L100
+L100 a := 1 L30
+
+L6 assume a = 1 L8
+L8 assume b = 0 L200
+L200 b := 1 L201
+L201 a := 0 L30
+
+L8 assume b = 1 L10
+L10 assume c = 0 L300
+L300 c := 1 L301
+L301 b := 0 L302
+L302 a := 0 L30
+
+L10 assume c = 1 L12
+L12 assume d = 0 L400
+L400 d := 1 L401
+L401 c := 0 L402
+L402 b := 0 L403
+L403 a := 0 L30
+
+L12 assume d = 1 L16
+L30 n := n - 1 L5
+L5 assume n = 0 L31
+L31 assert (EVEN n EVEN a ODD b EVEN c ODD d) L32
